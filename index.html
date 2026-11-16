@@ -1,0 +1,499 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Schatgraver</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@500;700;800&family=Space+Mono:wght@700&display=swap">
+<style>
+/* Layout: one centred column (max 760px). On top a cross-section of the earth where a little digger sinks deeper with every answer; under it the dig card and the full haul of answers. */
+/* Single dark look on purpose: the game takes place underground */
+:root{
+  color-scheme:dark;
+  --bg:#17111F; --rock:#221a2e; --surface:#2A2038; --ink:#F4EEFF; --muted:#B5A8CB; --line:#43355A;
+  --gold:#FFC94A; --gold-ink:#2B1A00; --bad:#FF6F7D;
+  --g1:#A8A2B4; --g2:#B97CFF; --g3:#4FA6FF; --g4:#FF4F7E; --g5:#8EF6FF;
+  --f-display:"Lilita One", "Arial Rounded MT Bold", system-ui, sans-serif;
+  --f-body:"Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono:"Space Mono", ui-monospace, Menlo, monospace;
+}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.5;min-height:100%;
+  background-image:radial-gradient(ellipse 70% 40% at 15% 0%,rgba(185,124,255,.16),transparent 70%),radial-gradient(ellipse 80% 50% at 50% 100%,rgba(255,201,74,.09),transparent 70%);
+  background-attachment:fixed;
+  padding-left:max(16px, env(safe-area-inset-left,0px));padding-right:max(16px, env(safe-area-inset-right,0px));padding-block:20px 48px}
+.wrap{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+
+header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px}
+.brand{font-family:var(--f-display);font-size:1.9rem;display:flex;align-items:center;gap:8px;line-height:1}
+.brand span{background:linear-gradient(180deg,#FFE29A,var(--gold) 55%,#E59A12);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 2px 0 #6b3d00)}
+.tabs{display:flex;gap:2px;background:var(--rock);border:2px solid var(--line);border-radius:999px;padding:4px;flex-wrap:wrap}
+.tabs button{border:0;background:transparent;padding:6px 12px;border-radius:999px;cursor:pointer;font-weight:800;color:var(--muted)}
+.tabs button:hover{color:var(--ink)}
+.tabs button[aria-selected="true"]{background:var(--gold);color:var(--gold-ink)}
+
+/* ---------- the mine ---------- */
+.mine{position:relative;height:280px;border-radius:18px;overflow:hidden;border:3px solid #5b3d22;box-shadow:0 6px 0 #24130a, inset 0 0 40px rgba(0,0,0,.6);background:#0d0a12}
+.world{position:absolute;left:0;right:0;top:0;transition:transform 1.5s cubic-bezier(.45,.05,.3,1);will-change:transform}
+.world.instant{transition:none}
+.sky{position:absolute;left:0;right:0;top:0;height:200px;background:linear-gradient(180deg,#1b1640,#4a3170 60%,#c47a6a);overflow:hidden}
+.sky i{position:absolute;width:2px;height:2px;border-radius:50%;background:#fff;opacity:.8}
+.sky .moon{position:absolute;right:14%;top:34px;width:34px;height:34px;border-radius:50%;background:#fff3c9;box-shadow:0 0 30px #fff3c9}
+.hill{position:absolute;bottom:0;width:180px;height:60px;border-radius:50% 50% 0 0;background:#2d2350}
+.layer{position:absolute;left:0;right:0}
+.layer .nm{position:absolute;left:12px;top:8px;font-family:var(--f-mono);font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.5)}
+.grass{position:absolute;left:0;right:0;height:12px;background:linear-gradient(#5fd06b,#2f8f3d);border-bottom:3px solid #1f5c28}
+.mark{position:absolute;left:46%;right:10px;display:flex;align-items:center;gap:8px;font-size:.8rem;font-weight:700;color:rgba(255,255,255,.82);transform:translateY(-50%);text-shadow:0 1px 2px #000}
+.mark::before{content:"";width:18px;height:2px;background:currentColor;opacity:.6;flex:none}
+.mark b{font-family:var(--f-mono);color:var(--gold);flex:none}
+.crystal{position:absolute;width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;filter:drop-shadow(0 0 6px currentColor)}
+.trail{position:absolute;left:calc(28% + 34px);transform:translate(0,-50%);filter:drop-shadow(0 0 8px rgba(255,255,255,.4))}
+.dark{position:absolute;inset:0;pointer-events:none;transition:opacity 1.5s;background:radial-gradient(circle at 28% 54%,transparent 0 70px,rgba(5,3,10,.92) 190px)}
+.digger{position:absolute;left:28%;top:150px;transform:translate(-50%,-100%);z-index:2}
+.digger .beam{position:absolute;left:30px;top:8px;width:150px;height:70px;background:linear-gradient(90deg,rgba(255,240,180,.35),transparent);clip-path:polygon(0 0,100% -40%,100% 140%,0 18%);pointer-events:none;transition:opacity 1.5s}
+.gauge{position:absolute;right:10px;top:10px;z-index:3;background:rgba(10,6,16,.75);border:2px solid #5b3d22;border-radius:12px;padding:6px 12px;text-align:right;line-height:1.1}
+.gauge small{display:block;font-family:var(--f-mono);font-size:.62rem;letter-spacing:.12em;color:#f3d8a8}
+.gauge b{font-family:var(--f-display);font-weight:400;font-size:1.7rem;color:var(--gold);font-variant-numeric:tabular-nums}
+.gauge b span{font-size:1rem;color:#f3d8a8}
+.gain{position:absolute;left:calc(28% + 30px);top:70px;z-index:3;font-family:var(--f-display);font-size:1.5rem;color:var(--gold);text-shadow:0 2px 0 #000;pointer-events:none;opacity:0}
+.bit{position:absolute;width:6px;height:6px;border-radius:2px;z-index:2;pointer-events:none;opacity:0}
+.pick{transform-box:view-box;transform-origin:36px 42px}
+@media (prefers-reduced-motion:no-preference){
+  .digger.dig .pick{animation:swing .28s ease-in-out 5 alternate}
+  @keyframes swing{from{transform:rotate(-55deg)}to{transform:rotate(25deg)}}
+  .digger.dig svg{animation:bob .28s ease-in-out 5 alternate}
+  @keyframes bob{to{transform:translateY(3px) scaleY(.95)}}
+  .digger.bonk svg{animation:shake .08s linear 6 alternate}
+  @keyframes shake{from{transform:translateX(-3px)}to{transform:translateX(3px)}}
+  .bit{animation:fly .9s ease-out forwards}
+  @keyframes fly{0%{opacity:1;transform:translate(0,0) rotate(0)}100%{opacity:0;transform:translate(var(--dx),var(--dy)) rotate(260deg)}}
+  .gain.go{animation:gain 1.8s ease-out forwards}
+  @keyframes gain{0%{opacity:0;transform:translateY(10px)}15%{opacity:1}70%{opacity:1}100%{opacity:0;transform:translateY(-30px)}}
+  .digger.idle svg{animation:breathe 2.4s ease-in-out infinite}
+  @keyframes breathe{50%{transform:translateY(-2px)}}
+}
+@media (prefers-reduced-motion:reduce){.world,.dark,.digger .beam{transition:none}.gain.go{opacity:1}}
+@media (max-width:560px){.mine{height:240px}.mark{left:42%;font-size:.72rem}}
+
+.chest{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;background:linear-gradient(180deg,#5a3418,#3d2210);border:3px solid #8a5a22;border-radius:14px;padding:8px 12px;box-shadow:inset 0 2px 0 rgba(255,220,150,.25),0 5px 0 #24130a}
+.chest .lbl{font-family:var(--f-mono);font-size:.75rem;color:#f3d8a8;text-transform:uppercase;letter-spacing:.08em}
+.slots{display:flex;gap:6px}
+.slot{width:32px;height:32px;border-radius:8px;background:rgba(0,0,0,.35);border:2px dashed rgba(243,216,168,.3);display:grid;place-items:center}
+.slot.cur{border:2px solid var(--gold)}
+.slot.full{border-style:solid;border-color:rgba(243,216,168,.4)}
+.slot .x{color:var(--bad);font-weight:800}
+
+.card{background:var(--surface);border:2px solid var(--line);border-radius:18px;padding:24px;display:flex;flex-direction:column;gap:16px;box-shadow:0 6px 0 rgba(0,0,0,.3)}
+.eyebrow{font-family:var(--f-mono);font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+h1,h2{font-family:var(--f-display);font-weight:400;margin:0;text-wrap:balance}
+h1{font-size:clamp(1.6rem,5vw,2.4rem);line-height:1.1}
+h2{font-size:1.4rem;line-height:1.15}
+.sub{color:var(--muted);margin:0}
+form{display:flex;gap:8px;flex-wrap:wrap}
+input[type=text]{flex:1 1 220px;min-width:0;padding:13px 16px;border-radius:12px;border:2px solid var(--line);background:var(--bg);font-size:1.1rem;font-weight:700}
+input[type=text]::placeholder{color:var(--muted);font-weight:500}
+input[type=text]:focus{border-color:var(--gold);outline:none}
+.btn{border:0;border-radius:12px;padding:12px 20px;font-weight:800;cursor:pointer;background:var(--gold);color:var(--gold-ink);box-shadow:0 4px 0 #a86a00;transition:transform .08s}
+.btn:active{transform:translateY(3px);box-shadow:0 1px 0 #a86a00}
+.btn:disabled{opacity:.45;cursor:default}
+.btn.ghost{background:transparent;color:var(--muted);border:2px solid var(--line);box-shadow:none}
+.btn.ghost:hover{color:var(--ink);border-color:var(--muted)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.msg{min-height:1.5em;margin:0;font-weight:800}
+.msg.bad{color:var(--bad)}
+.msg.ok{color:var(--g5)}
+
+.find{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.find .art{width:72px;height:72px;display:grid;place-items:center;flex:none}
+.find .big{font-family:var(--f-display);font-size:clamp(1.6rem,6vw,2.3rem);line-height:1.05}
+.find .meta{display:flex;flex-direction:column;gap:6px;min-width:0}
+.tag{display:inline-flex;align-items:center;gap:6px;font-family:var(--f-mono);font-size:.8rem;padding:4px 10px;border-radius:999px;border:2px solid currentColor;width:max-content}
+@media (prefers-reduced-motion:no-preference){
+  .pop{animation:pop .4s cubic-bezier(.3,1.6,.5,1)}
+  @keyframes pop{from{transform:scale(.92);opacity:.3}to{transform:none;opacity:1}}
+  .find .art svg{animation:rise .7s cubic-bezier(.3,1.7,.5,1)}
+  @keyframes rise{from{transform:translateY(24px) scale(.3) rotate(-20deg)}to{transform:none}}
+}
+
+.tiers{display:flex;flex-direction:column;gap:14px}
+.tier{display:grid;grid-template-columns:160px 1fr;gap:12px;align-items:start;padding-top:14px;border-top:2px dashed var(--line)}
+.tier:first-child{border-top:0;padding-top:0}
+.tier-h{display:flex;align-items:center;gap:8px;font-family:var(--f-display);font-size:1.1rem;line-height:1.1}
+.tier-h small{display:block;font-family:var(--f-mono);font-size:.72rem;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;min-width:0}
+.chip{padding:4px 11px;border-radius:999px;font-size:.93rem;font-weight:700;background:var(--rock);border:2px solid var(--line)}
+.chip.me,.chip.got{background:var(--tc);color:var(--bg);border-color:var(--tc)}
+.chip.me{box-shadow:0 0 0 3px var(--surface),0 0 0 5px var(--tc)}
+.chip.miss{border-style:dashed;color:var(--muted);background:transparent}
+.chip.hide{color:transparent;background:repeating-linear-gradient(45deg,var(--rock),var(--rock) 4px,var(--line) 4px,var(--line) 8px);user-select:none;min-width:58px}
+@media (max-width:560px){.tier{grid-template-columns:1fr;gap:8px}.slot{width:28px;height:28px}.slots{gap:4px}}
+
+.sum{display:flex;flex-direction:column}
+.sum-row{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:10px 0;border-top:2px dashed var(--line)}
+.sum-row:first-child{border-top:0}
+.sum-row .cat{min-width:0;font-weight:800}
+.sum-row .cat small{display:block;color:var(--muted);font-weight:600}
+.pts{font-family:var(--f-mono);font-variant-numeric:tabular-nums;text-align:right;min-width:4ch;color:var(--gold)}
+.total{font-family:var(--f-display);font-size:clamp(3rem,11vw,4.6rem);line-height:1;color:var(--gold)}
+.total small{font-family:var(--f-mono);font-size:1rem;color:var(--muted)}
+.stats{display:flex;gap:24px;flex-wrap:wrap;font-family:var(--f-mono);font-size:.8rem;color:var(--muted)}
+.stats b{color:var(--ink);font-size:1.15rem;display:block}
+textarea{width:100%;border-radius:12px;border:2px solid var(--line);background:var(--bg);padding:10px;font-family:var(--f-mono);font-size:.85rem;resize:none}
+
+select{padding:10px 12px;border-radius:12px;border:2px solid var(--line);background:var(--bg);max-width:100%;font-weight:700}
+.counter{font-family:var(--f-mono);font-variant-numeric:tabular-nums;color:var(--gold)}
+.note{font-size:.88rem;color:var(--muted);margin:0}
+.legend{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:.85rem;color:var(--muted);align-items:center}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+
+</style>
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand" id="brand"></div>
+    <div class="tabs" role="tablist">
+      <button id="tab-dag" role="tab" aria-selected="true">Vandaag</button>
+      <button id="tab-onb" role="tab" aria-selected="false">Onbeperkt</button>
+      <button id="tab-oefen" role="tab" aria-selected="false">Oefenen</button>
+    </div>
+  </header>
+  <section class="mine" id="mine" aria-label="Mijnschacht">
+    <div class="world" id="world"></div>
+    <div class="dark" id="dark"></div>
+    <div class="digger idle" id="digger"></div>
+    <div class="gain" id="gain"></div>
+    <div class="gauge"><small>DIEPTE</small><b id="depth">0<span> m</span></b></div>
+  </section>
+  <main id="app" style="display:flex;flex-direction:column;gap:16px"></main>
+  <div class="legend" id="legend"></div>
+</div>
+
+<script>
+const TIERS=[{n:'Kiezel',p:10,c:'#A8A2B4',e:'🪨'},{n:'Amethist',p:20,c:'#B97CFF',e:'🟣'},{n:'Saffier',p:40,c:'#4FA6FF',e:'🔷'},{n:'Robijn',p:70,c:'#FF4F7E',e:'❤️'},{n:'Diamant',p:100,c:'#8EF6FF',e:'💎'}];
+const ROUNDS=7;
+
+// a[0] = kiezel … a[4] = diamant. "Naam/alias/alias"
+const CATS=[
+{t:'EU-lidstaten',q:'Noem een lidstaat van de Europese Unie',a:[
+'Nederland/Holland;België;Duitsland;Frankrijk;Spanje;Italië',
+'Portugal;Oostenrijk;Griekenland;Zweden;Polen;Ierland;Denemarken',
+'Finland;Tsjechië/Tsjechische Republiek;Hongarije;Luxemburg;Kroatië',
+'Roemenië;Bulgarije;Slowakije;Slovenië;Estland;Letland;Litouwen',
+'Malta;Cyprus']},
+{t:'Europese hoofdsteden',q:'Noem een hoofdstad van een Europees land',a:[
+'Amsterdam;Brussel;Berlijn;Parijs;Londen;Madrid;Rome',
+'Lissabon;Wenen;Athene;Dublin;Kopenhagen;Stockholm;Oslo;Bern;Warschau;Praag',
+'Helsinki;Boedapest/Budapest;Luxemburg;Moskou;Kyiv/Kiev/Kyjiv;Reykjavik;Monaco;Vaticaanstad',
+'Boekarest;Sofia;Belgrado;Zagreb;Bratislava;Ljubljana;Tallinn;Riga;Vilnius;Minsk;Tirana;Sarajevo;Andorra la Vella;San Marino',
+'Valletta;Nicosia;Skopje;Podgorica;Chisinau/Kisjinev;Vaduz;Pristina']},
+{t:'Afrikaanse landen',q:'Noem een land in Afrika',a:[
+'Egypte;Zuid-Afrika;Marokko;Nigeria;Kenia',
+'Ethiopië;Ghana;Algerije;Tunesië;Tanzania;Senegal;Libië;Madagaskar;Somalië;Soedan;Oeganda;Kameroen',
+'Zimbabwe;Mozambique;Angola;Namibië;Botswana;Rwanda;Mali;Ivoorkust;Zambia;Democratische Republiek Congo/DR Congo/DRC/Congo-Kinshasa/Zaïre;Tsjaad;Niger;Zuid-Soedan;Kaapverdië;Sierra Leone;Liberia',
+'Burkina Faso;Benin;Togo;Guinee;Mauritanië;Malawi;Burundi;Gabon;Eritrea;Djibouti;Lesotho;Eswatini/Swaziland;Gambia;Mauritius;Seychellen;Republiek Congo/Congo/Congo-Brazzaville;Centraal-Afrikaanse Republiek/CAR',
+'Guinee-Bissau;Equatoriaal-Guinea;Comoren;Sao Tomé en Principe']},
+{t:'Zuid-Amerika',q:'Noem een land in Zuid-Amerika',a:[
+'Brazilië;Argentinië','Chili;Peru;Colombia;Suriname','Venezuela;Ecuador;Bolivia;Uruguay','Paraguay','Guyana']},
+{t:'Hoofdsteden van Zuid-Amerika',q:'Noem een hoofdstad van een Zuid-Amerikaans land',a:[
+'Buenos Aires;Lima;Santiago','Brasília;Bogotá;Paramaribo;Caracas','Quito;Montevideo;La Paz','Asunción;Sucre','Georgetown']},
+{t:'Staten van de VS',q:'Noem een staat van de Verenigde Staten',a:[
+'Californië/California;Texas;Florida;New York;Hawaï/Hawaii;Alaska',
+'Washington;Nevada;Arizona;Colorado;Illinois;Georgia;Ohio;Michigan;Massachusetts;New Jersey;Virginia;Pennsylvania/Pennsylvanië',
+'Oregon;Utah;Louisiana;Tennessee;Kentucky;North Carolina/Noord-Carolina;South Carolina/Zuid-Carolina;Montana;Minnesota;Wisconsin;Indiana;Missouri;Alabama;Mississippi;Kansas;Oklahoma;New Mexico;Maryland;Connecticut',
+'Iowa;Nebraska;Idaho;Wyoming;Arkansas;North Dakota/Noord-Dakota;South Dakota/Zuid-Dakota;West Virginia;Maine;Vermont;New Hampshire;Rhode Island',
+'Delaware']},
+{t:'Chemische elementen',q:'Noem een chemisch element',a:[
+'Waterstof/Hydrogen;Zuurstof/Oxygen;Koolstof/Carbon;Stikstof/Nitrogen;Helium;IJzer/Iron;Goud/Gold;Zilver/Silver;Koper/Copper;Lood/Lead;Uranium;Aluminium;Calcium;Natrium/Sodium;Chloor/Chlorine',
+'Neon;Kalium/Potassium;Magnesium;Zink/Zinc;Tin;Kwik/Mercury;Platina/Platinum;Zwavel/Sulfur;Fosfor/Phosphorus;Jodium/Iodine;Silicium/Silicon;Nikkel/Nickel;Lithium;Titaan/Titanium;Plutonium;Chroom/Chromium;Argon;Fluor/Fluorine',
+'Kobalt/Cobalt;Mangaan/Manganese;Wolfraam/Tungsten;Radium;Krypton;Xenon;Arseen/Arsenicum/Arsenic;Broom/Bromine;Barium;Cesium/Caesium;Boor/Borium/Boron;Beryllium;Palladium;Iridium;Osmium;Polonium;Thorium;Cadmium;Bismut/Bismuth;Antimoon/Antimony;Seleen/Selenium;Strontium;Neodymium;Radon;Germanium;Gallium;Vanadium;Molybdeen/Molybdenum',
+'Scandium;Rubidium;Zirkonium/Zirconium;Niobium;Technetium;Ruthenium;Rodium/Rhodium;Indium;Telluur/Tellurium;Lanthaan/Lanthanum;Cerium;Europium;Gadolinium;Hafnium;Tantaal/Tantalum;Renium/Rhenium;Thallium;Francium;Actinium;Americium;Californium;Einsteinium;Curium;Fermium;Nobelium;Mendelevium;Neptunium;Astaat/Astatium/Astatine;Samarium;Erbium;Ytterbium;Yttrium',
+'Praseodymium;Promethium;Terbium;Dysprosium;Holmium;Thulium;Lutetium;Protactinium;Berkelium;Lawrencium;Rutherfordium;Dubnium;Seaborgium;Bohrium;Hassium;Meitnerium;Darmstadtium;Roentgenium/Röntgenium;Copernicium;Nihonium;Flerovium;Moscovium;Livermorium;Tennessine/Tennessium;Oganesson']},
+{t:'Griekse letters',q:'Noem een letter uit het Griekse alfabet',a:[
+'Alfa/Alpha;Bèta/Beta;Gamma;Delta;Pi;Omega',
+'Sigma;Lambda/Labda;Theta;Epsilon;Mu',
+'Phi/Fi;Psi;Rho;Tau;Kappa;Zeta;Eta;Chi',
+'Iota/Jota;Nu;Xi;Omikron/Omicron',
+'Ypsilon/Upsilon']},
+{t:'Dierenriem',q:'Noem een sterrenbeeld van de dierenriem',a:[
+'Leeuw/Leo;Maagd/Virgo;Ram/Aries;Stier/Taurus;Vissen/Pisces;Schorpioen/Scorpio',
+'Tweelingen/Gemini;Kreeft/Cancer;Weegschaal/Libra;Steenbok/Capricorn/Capricornus;Waterman/Aquarius',
+'Boogschutter/Sagittarius','','']},
+{t:'Nederlandse provincies',q:'Noem een provincie van Nederland',a:[
+'Noord-Holland;Zuid-Holland;Utrecht;Noord-Brabant/Brabant;Limburg','Gelderland;Friesland/Fryslân;Groningen;Zeeland','Overijssel;Drenthe','Flevoland','']},
+{t:'Provinciehoofdsteden',q:'Noem een hoofdstad van een Nederlandse provincie',n:'Let op: niet altijd de grootste stad van de provincie.',a:[
+'Utrecht;Groningen','Den Haag/\'s-Gravenhage;Haarlem;Maastricht;Arnhem;Leeuwarden','Zwolle;\'s-Hertogenbosch/Den Bosch;Middelburg','Assen;Lelystad','']},
+{t:'Belgische provincies',q:'Noem een provincie van België',a:[
+'Antwerpen;Limburg','Oost-Vlaanderen;West-Vlaanderen;Luik;Namen','Vlaams-Brabant;Henegouwen;Luxemburg','Waals-Brabant','']},
+{t:'Duitse deelstaten',q:'Noem een deelstaat van Duitsland',a:[
+'Beieren/Bayern;Berlijn/Berlin;Hamburg',
+'Noordrijn-Westfalen/Nordrhein-Westfalen/NRW;Baden-Württemberg;Saksen/Sachsen;Bremen;Nedersaksen/Niedersachsen',
+'Hessen;Brandenburg;Thüringen;Sleeswijk-Holstein/Schleswig-Holstein;Rijnland-Palts/Rheinland-Pfalz',
+'Saarland;Mecklenburg-Voor-Pommeren/Mecklenburg-Vorpommern;Saksen-Anhalt/Sachsen-Anhalt','']},
+{t:'Canadese provincies en territoria',q:'Noem een provincie of territorium van Canada',a:[
+'Quebec;Ontario;Brits-Columbia/British Columbia','Alberta;Nova Scotia/Nieuw-Schotland;Newfoundland en Labrador/Newfoundland/Newfoundland and Labrador',
+'Manitoba;Saskatchewan;Yukon;New Brunswick/Nieuw-Brunswijk','Prince Edward Island/Prins Edwardeiland;Nunavut;Northwest Territories/Noordwestelijke Territoria/Northwest Territoria','']},
+{t:'Zonnestelsel',q:'Noem een planeet of dwergplaneet van ons zonnestelsel',a:[
+'Aarde/Earth;Mars;Jupiter;Saturnus/Saturn','Venus;Mercurius/Mercury;Neptunus/Neptune;Uranus','Pluto','Ceres;Eris','Haumea;Makemake']},
+{t:'Wereldwonderen van de oudheid',q:'Noem een van de zeven wereldwonderen van de oudheid',a:[
+'','Piramide van Gizeh/Piramides/Piramide/Grote Piramide/Piramides van Gizeh/Cheopspiramide',
+'Hangende tuinen van Babylon/Hangende tuinen/Tuinen van Babylon;Kolossus van Rhodos/Colossus/Kolossus/Colossus van Rhodos;Vuurtoren van Alexandrië/Pharos/Vuurtoren van Pharos',
+'Mausoleum van Halicarnassus/Mausoleum;Tempel van Artemis/Artemistempel/Artemision;Beeld van Zeus/Zeusbeeld/Zeus/Beeld van Zeus in Olympia','']},
+{t:'Olympische Zomerspelen',q:'Noem een stad die de Olympische Zomerspelen heeft georganiseerd',n:'Alleen spelen die al zijn gehouden (t/m Parijs 2024).',a:[
+'Amsterdam;Londen/London;Parijs/Paris;Barcelona;Atlanta;Sydney;Peking/Beijing;Tokio/Tokyo;Rio de Janeiro/Rio',
+'Los Angeles/LA;Athene/Athens;Moskou/Moscow;Berlijn/Berlin;Rome;München/Munchen/Munich;Seoel/Seoul',
+'Montreal;Mexico-Stad/Mexico City/Mexico;Melbourne;Helsinki;Stockholm;Antwerpen','St. Louis/Saint Louis','']},
+{t:'Amerikaanse presidenten',q:'Noem de achternaam van een president van de VS',n:'40 unieke achternamen (Adams, Harrison, Johnson, Roosevelt en Bush kwamen twee keer voor).',a:[
+'Washington;Lincoln;Kennedy;Obama;Trump;Biden;Clinton;Bush;Roosevelt;Nixon;Reagan',
+'Jefferson;Carter;Ford;Eisenhower;Truman;Johnson;Adams',
+'Grant;Madison;Monroe;Jackson;Wilson;Hoover;Taft;McKinley;Coolidge',
+'Van Buren;Harrison;Tyler;Polk;Taylor;Cleveland;Harding;Garfield',
+'Fillmore;Pierce;Buchanan;Hayes;Arthur']},
+{t:'Officiële EU-talen',q:'Noem een officiële taal van de Europese Unie',a:[
+'Nederlands;Engels;Frans;Duits;Spaans;Italiaans','Portugees;Pools;Zweeds;Deens;Grieks',
+'Fins;Hongaars;Tsjechisch;Roemeens;Iers/Iers-Gaelisch/Gaelisch;Kroatisch;Bulgaars','Slowaaks;Sloveens;Ests/Estisch;Lets;Litouws','Maltees']},
+{t:'Olympische goden',q:'Noem een van de twaalf Olympische goden (Grieks)',n:'Sommige bronnen noemen Hestia, andere Dionysos; beide tellen.',a:[
+'Zeus;Poseidon;Athena/Athene;Apollo','Hera;Hermes;Afrodite/Aphrodite;Ares;Artemis','Dionysos/Dionysus;Hefaistos/Hephaistos/Hephaestus;Demeter','Hestia','']},
+{t:'Waddeneilanden',q:'Noem een Nederlands Waddeneiland',a:[
+'Texel;Terschelling;Ameland','Vlieland;Schiermonnikoog','','Griend;Rottumeroog;Rottumerplaat','Noorderhaaks/Razende Bol;Simonszand']},
+];
+
+function norm(s){return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/^(de|het|the)\s+/,'').replace(/[^a-z0-9]/g,'')}
+CATS.forEach(c=>{c.items=[];c.a.forEach((s,ti)=>{if(!s)return;s.split(';').forEach(e=>{const p=e.split('/').map(x=>x.trim()).filter(Boolean);c.items.push({name:p[0],tier:ti,keys:[...new Set(p.map(norm))]})})})});
+
+function lev(a,b){if(a===b)return 0;const m=a.length,n=b.length;if(Math.abs(m-n)>2)return 9;let prev=Array.from({length:n+1},(_,j)=>j);for(let i=1;i<=m;i++){const cur=[i];for(let j=1;j<=n;j++)cur[j]=Math.min(prev[j]+1,cur[j-1]+1,prev[j-1]+(a[i-1]===b[j-1]?0:1));prev=cur}return prev[n]}
+function match(input,cat){
+  const k=norm(input); if(!k)return null;
+  let i=cat.items.findIndex(it=>it.keys.includes(k)); if(i>=0)return i;
+  const tol=k.length>=9?2:k.length>=5?1:0; if(!tol)return null;
+  let best=-1,bd=99; cat.items.forEach((it,ix)=>it.keys.forEach(key=>{if(key.length<4)return;const d=lev(k,key);if(d<bd){bd=d;best=ix}}));
+  return bd<=tol?best:null;
+}
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const tc=t=>`var(--g${t+1})`;
+
+function gem(t,s=28){
+  const c=TIERS[t].c;
+  if(t===0)return `<svg width="${s}" height="${s}" viewBox="0 0 32 32" aria-hidden="true"><ellipse cx="16" cy="19" rx="13" ry="9" fill="${c}"/><ellipse cx="12" cy="15.5" rx="5" ry="2.4" fill="#fff" opacity=".3"/><ellipse cx="16" cy="27" rx="11" ry="2" fill="#000" opacity=".25"/></svg>`;
+  if(t===1)return `<svg width="${s}" height="${s}" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2l12 9-4 17H8L4 11z" fill="${c}"/><path d="M16 2l-4 11 4 15 4-15zM4 11h24" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width="1.3"/><path d="M16 2L4 11h8z" fill="#fff" opacity=".25"/></svg>`;
+  if(t===2)return `<svg width="${s}" height="${s}" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2l13 8v12l-13 8-13-8V10z" fill="${c}"/><path d="M16 8l7 4v8l-7 4-7-4v-8z" fill="#fff" opacity=".22"/><path d="M16 2v6M29 10l-6 2M29 22l-6-2M16 30v-6M3 22l6-2M3 10l6 2" stroke="#fff" stroke-opacity=".45" stroke-width="1.3"/></svg>`;
+  if(t===3)return `<svg width="${s}" height="${s}" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 29C6 21 2 15 2 10a7 7 0 0 1 14-2 7 7 0 0 1 14 2c0 5-4 11-14 19z" fill="${c}"/><path d="M8 7l4 5-4 4M16 8v9l-6 4M16 17l6 4M24 7l-4 5 4 4M12 12h8" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width="1.2"/><path d="M5 9a4 4 0 0 1 6-3" stroke="#fff" stroke-width="2" stroke-linecap="round" fill="none" opacity=".6"/></svg>`;
+  return `<svg width="${s}" height="${s}" viewBox="0 0 32 32" aria-hidden="true"><path d="M8 4h16l6 8-14 17L2 12z" fill="${c}"/><path d="M8 4h16l6 8H2z" fill="#fff" opacity=".35"/><path d="M2 12h28M8 4l4 8 4-8 4 8 4-8M12 12l4 17 4-17" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="1.2"/><path d="M26 1l1 2 2 1-2 1-1 2-1-2-2-1 2-1z" fill="#fff"/></svg>`;
+}
+function shuffle(a,rnd=Math.random){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function mulberry(seed){return()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+
+const store={get(k,d){try{const v=localStorage.getItem('sg_'+k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem('sg_'+k,JSON.stringify(v))}catch(e){}}};
+
+const now=new Date();
+const DAY=Math.floor((Date.UTC(now.getFullYear(),now.getMonth(),now.getDate())-Date.UTC(2026,0,1))/864e5)+1;
+function dailyOrder(){return shuffle(CATS.map((_,i)=>i),mulberry(DAY*7919+13)).slice(0,ROUNDS)}
+
+/* ================= THE MINE ================= */
+const SKY=200, PX=4, DIG_Y=150; // world px: surface at SKY, 4px per metre, digger's feet at y=150 in the window
+const LAYERS=[
+  {from:0,to:30,c:'#6b4528',dot:'#4f321c',n:'Klei en veen'},
+  {from:30,to:150,c:'#8a6a3c',dot:'#a8885a',n:'Zand en grind'},
+  {from:150,to:350,c:'#8f4f33',dot:'#6e3a24',n:'Zandsteen'},
+  {from:350,to:550,c:'#4b4655',dot:'#6c6578',n:'Graniet'},
+  {from:550,to:690,c:'#261c40',dot:'#3b2c5e',n:'Kristalgrot'},
+  {from:690,to:800,c:'#3a2610',dot:'#ffc94a',n:'De schatkamer'}];
+const MARKS=[
+  [1,'kabels en waterleidingen'],[12,'hier is het hele jaar zo’n 10 °C'],[60,'grondwater'],
+  [100,'elke 100 m omlaag wordt het zo’n 3 °C warmer'],[200,'zo diep reikt geen enkele boomwortel'],
+  [330,'de Eiffeltoren ondersteboven'],[450,'graniet: keihard gesteente'],[553,'de CN Tower ondersteboven'],
+  [620,'kristallen zo groot als jij'],[700,'de schatkamer: een perfect spel']];
+const world=document.getElementById('world'), dark=document.getElementById('dark'), digger=document.getElementById('digger');
+(function buildWorld(){
+  const rnd=mulberry(42);
+  let stars='';for(let i=0;i<40;i++)stars+=`<i style="left:${(rnd()*100).toFixed(1)}%;top:${(rnd()*150).toFixed(0)}px;opacity:${(.3+rnd()*.7).toFixed(2)}"></i>`;
+  let h=`<div class="sky">${stars}<div class="moon"></div><div class="hill" style="left:-40px"></div><div class="hill" style="left:55%;width:260px;height:44px"></div></div>`;
+  LAYERS.forEach(L=>{
+    const top=SKY+L.from*PX, ht=(L.to-L.from)*PX;
+    h+=`<div class="layer" style="top:${top}px;height:${ht}px;background-color:${L.c};background-image:radial-gradient(${L.dot} 2px,transparent 3px),radial-gradient(${L.dot} 1.5px,transparent 2.5px);background-size:46px 38px,29px 33px;background-position:0 0,13px 17px;${L.from===690?'background-image:radial-gradient(#ffc94a 1.5px,transparent 2.5px),radial-gradient(#ffe7a0 1px,transparent 2px);':''}"><span class="nm">${L.n}</span></div>`;
+  });
+  h+=`<div class="grass" style="top:${SKY-6}px"></div>`;
+  for(let i=0;i<26;i++){const d=560+rnd()*125,col=['#B97CFF','#8EF6FF','#4FA6FF','#FF4F7E'][i%4],up=rnd()<.5,sz=10+rnd()*22;
+    h+=`<span class="crystal" style="left:${(rnd()*96).toFixed(1)}%;top:${SKY+d*PX}px;color:${col};${up?`border-bottom:${sz}px solid ${col}`:`border-top:${sz}px solid ${col}`}"></span>`}
+  MARKS.forEach(([d,t])=>h+=`<div class="mark" style="top:${SKY+d*PX}px"><b>${d} m</b><span>${t}</span></div>`);
+  h+=`<div id="trail"></div>`;
+  world.innerHTML=h; world.style.height=(SKY+800*PX)+'px';
+})();
+digger.innerHTML=`<div class="beam" id="beam"></div><svg width="60" height="70" viewBox="0 0 60 70" aria-hidden="true">
+  <rect x="19" y="56" width="8" height="10" rx="2" fill="#3b2a5a"/><rect x="31" y="56" width="8" height="10" rx="2" fill="#3b2a5a"/>
+  <rect x="17" y="64" width="11" height="6" rx="3" fill="#2a1a10"/><rect x="30" y="64" width="11" height="6" rx="3" fill="#2a1a10"/>
+  <rect x="17" y="34" width="24" height="25" rx="9" fill="#FF8A3D"/><rect x="21" y="40" width="16" height="12" rx="3" fill="#E5672A"/>
+  <circle cx="29" cy="25" r="11" fill="#F6C9A0"/><circle cx="25" cy="25" r="1.7" fill="#2b1a00"/><circle cx="33" cy="25" r="1.7" fill="#2b1a00"/>
+  <path d="M25 30q4 3 8 0" stroke="#2b1a00" stroke-width="1.6" fill="none" stroke-linecap="round"/><circle cx="22" cy="29" r="2" fill="#ff9a8a" opacity=".6"/><circle cx="36" cy="29" r="2" fill="#ff9a8a" opacity=".6"/>
+  <path d="M16 22a13 12 0 0 1 26 0z" fill="#FFC94A"/><rect x="14" y="20" width="30" height="4" rx="2" fill="#E59A12"/><circle cx="29" cy="14" r="3.6" fill="#FFF6C8"/>
+  <g class="pick"><line x1="36" y1="42" x2="52" y2="22" stroke="#8a5a22" stroke-width="3.5" stroke-linecap="round"/><path d="M42 15q9-4 17 6" stroke="#cfd2dc" stroke-width="4" fill="none" stroke-linecap="round"/><circle cx="37" cy="42" r="3.5" fill="#F6C9A0"/></g>
+</svg>`;
+let shownDepth=-1;
+function layerAt(d){return LAYERS.find(L=>d>=L.from&&d<L.to)||LAYERS[LAYERS.length-1]}
+function setMine(g,animate){
+  const d=g?g.score:0;
+  world.classList.toggle('instant',!animate); dark.style.transition=animate?'':'none';
+  world.style.transform=`translateY(${DIG_Y-(SKY+d*PX)}px)`;
+  dark.style.opacity=Math.min(.85,d/280).toFixed(2);
+  document.getElementById('beam').style.opacity=d>15?1:0;
+  // gems left behind in the wall
+  let tr='',acc=0; if(g)g.res.forEach((r,i)=>{acc+=r.pts; if(r.ix!=null&&(g.phase!=='reveal'||i<g.round||!animate)){const t=CATS[g.order[i]].items[r.ix].tier;tr+=`<span class="trail" style="top:${SKY+acc*PX-16}px">${gem(t,26)}</span>`}});
+  document.getElementById('trail').innerHTML=tr;
+  if(!animate)countTo(d,0);
+  if(!animate)void world.offsetHeight;
+  shownDepth=d;
+}
+let countRaf;
+function countTo(target,ms){
+  const el=document.getElementById('depth'),from=+(el.dataset.v||0),t0=performance.now();cancelAnimationFrame(countRaf);
+  const step=t=>{const k=ms?Math.min(1,(t-t0)/ms):1,v=Math.round(from+(target-from)*(1-Math.pow(1-k,3)));el.innerHTML=v+'<span> m</span>';el.dataset.v=v;if(k<1)countRaf=requestAnimationFrame(step)};
+  countRaf=requestAnimationFrame(step);
+}
+function digAnim(g,pts,tier){
+  const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const mine=document.getElementById('mine'),gain=document.getElementById('gain');
+  digger.classList.remove('idle','dig','bonk');void digger.offsetWidth;
+  if(pts>0){
+    digger.classList.add('dig');
+    const L=layerAt(g.score-pts);
+    if(!reduce)for(let i=0;i<14;i++){const b=document.createElement('span');b.className='bit';const ang=-Math.PI*(.1+Math.random()*.8);const r=30+Math.random()*60;
+      b.style.cssText=`left:calc(28% + ${-10+Math.random()*30}px);top:${DIG_Y-6}px;background:${i%4?L.dot:L.c};--dx:${Math.cos(ang)*r}px;--dy:${Math.sin(ang)*r}px;animation-delay:${i*60}ms`;
+      mine.appendChild(b);setTimeout(()=>b.remove(),1900)}
+    setTimeout(()=>setMine(g,true),reduce?0:350);
+    countTo(g.score,reduce?0:1700);
+    gain.innerHTML=`+${pts} m`;gain.style.color=TIERS[tier].c;
+  }else{
+    digger.classList.add('bonk');gain.innerHTML='tok!';gain.style.color='var(--bad)';
+  }
+  gain.classList.remove('go');void gain.offsetWidth;gain.classList.add('go');
+  setTimeout(()=>{digger.classList.remove('dig','bonk');digger.classList.add('idle')},1600);
+}
+
+/* ================= GAME STATE ================= */
+let mode='dag', games={}, oefen;
+function newGame(kind){
+  const g={kind,order:kind==='dag'?dailyOrder():shuffle(CATS.map((_,i)=>i)).slice(0,ROUNDS),round:0,score:0,res:[],phase:'ask'};
+  if(kind==='dag'){const saved=store.get('dag_'+DAY,null);if(saved){Object.assign(g,saved,{phase:'done',round:ROUNDS-1})}}
+  games[kind]=g;
+}
+function newOefen(ci){oefen={ci:ci??(oefen?oefen.ci:0),found:[],shown:false,msg:'',ok:false}}
+newGame('dag'); newGame('onb'); newOefen(Math.floor(Math.random()*CATS.length));
+mode=games.dag.phase==='done'?'onb':'dag';
+
+const app=document.getElementById('app');
+function tierList(cat,opts){
+  return `<div class="tiers">${TIERS.map((T,ti)=>{
+    const items=cat.items.map((it,ix)=>({it,ix})).filter(o=>o.it.tier===ti); if(!items.length)return '';
+    const got=opts.found?items.filter(o=>opts.found.includes(o.ix)).length:null;
+    const chips=items.map(({it,ix})=>{
+      let cls='chip';
+      if(opts.mine===ix)cls+=' me';
+      else if(opts.found){ if(opts.found.includes(ix))cls+=' got'; else cls+=opts.shown?' miss':' hide'}
+      const label=(opts.found&&!opts.shown&&!opts.found.includes(ix))?'·····':esc(it.name);
+      return `<span class="${cls}" style="--tc:${tc(ti)}">${label}</span>`}).join('');
+    return `<div class="tier"><div class="tier-h" style="color:${tc(ti)}">${gem(ti,30)}<div>${T.n}<small>+${T.p} m · ${got!=null?got+'/':''}${items.length}</small></div></div><div class="chips">${chips}</div></div>`}).join('')}</div>`;
+}
+
+function render(){
+  ['dag','onb','oefen'].forEach(m=>document.getElementById('tab-'+m).setAttribute('aria-selected',mode===m));
+  const playing=mode==='dag'||mode==='onb';
+  document.getElementById('mine').hidden=!playing;
+  if(mode==='oefen')renderOefen(); else renderSpel(games[mode]);
+}
+function switchTo(m){mode=m;render();if(m==='dag'||m==='onb')setMine(games[m],false);focusInput()}
+
+function chestBar(g){
+  const slots=Array.from({length:ROUNDS},(_,i)=>{const r=g.res[i];
+    if(r)return `<span class="slot full">${r.ix!=null?gem(CATS[g.order[i]].items[r.ix].tier,22):'<span class="x">✕</span>'}</span>`;
+    return `<span class="slot ${i===g.round&&g.phase!=='done'?'cur':''}"></span>`}).join('');
+  const lbl=g.phase==='done'?(g.kind==='dag'?'Schatkaart #'+DAY+' klaar':'Kist vol'):(g.kind==='dag'?'Kaart #'+DAY+' · ':'')+'Ronde '+(g.round+1)+' van '+ROUNDS;
+  return `<div class="chest"><span class="lbl">${lbl}</span><span class="slots" aria-hidden="true">${slots}</span></div>`;
+}
+function shareText(g){return `Schatgraver #${DAY} · ${g.score} m diep\n`+g.res.map((r,i)=>r.ix!=null?TIERS[CATS[g.order[i]].items[r.ix].tier].e:'✖️').join('')}
+
+function renderSpel(g){
+  const bar=chestBar(g);
+  if(g.phase==='done'){
+    const best=Math.max(store.get('best',0),g.score), played=Math.max(store.get('played',0),1), daily=g.kind==='dag';
+    const L=layerAt(Math.max(0,g.score-1));
+    app.innerHTML=bar+`<div class="card pop"><div class="eyebrow">${daily?'Schatkaart van vandaag':'Je diepste tocht'}</div><div class="total">${g.score}<small> m diep</small></div>
+      <p class="sub">Je kwam tot in de laag <b style="color:var(--ink)">${L.n}</b>. ${g.score>=700?'Je bereikte de schatkamer!':'De schatkamer ligt op 700 m.'}</p>
+      <div class="stats"><span><b>${best} m</b>je diepste ooit</span><span><b>${played}</b>tochten gegraven</span></div>
+      <div class="sum">${g.res.map((r,i)=>{const c=CATS[g.order[i]];const it=r.ix!=null?c.items[r.ix]:null;return `<div class="sum-row">${it?gem(it.tier,26):'<span class="x" style="color:var(--bad);font-weight:800;width:26px;text-align:center">✕</span>'}<div class="cat">${esc(c.t)}<small>${it?esc(it.name)+' · '+TIERS[it.tier].n:(r.input?'“'+esc(r.input)+'” telde niet':'overgeslagen')}</small></div><span class="pts">+${r.pts} m</span></div>`}).join('')}</div>
+      ${daily?`<p class="note">Iedereen krijgt vandaag dezelfde 7 categorieën. Morgen ligt er een nieuwe schatkaart klaar.</p>
+      <div class="row"><button class="btn" id="share">Kopieer mijn score</button><button class="btn ghost" id="toOnb">Onbeperkt verder</button></div><p class="msg ok" id="shmsg" aria-live="polite"></p><textarea id="shtxt" rows="2" readonly hidden></textarea>`
+      :`<div class="row"><button class="btn" id="again">Nieuwe tocht</button></div>`}</div>`;
+    if(daily){
+      document.getElementById('share').onclick=()=>{const t=shareText(g),ta=document.getElementById('shtxt'),m=document.getElementById('shmsg');
+        const fb=()=>{ta.hidden=false;ta.value=t;ta.select();m.textContent='Kopiëren lukte niet automatisch. Selecteer de tekst hieronder.'};
+        try{navigator.clipboard.writeText(t).then(()=>{m.textContent='Gekopieerd! Plak het in je groepsapp.'},fb)}catch(e){fb()}};
+      document.getElementById('toOnb').onclick=()=>switchTo('onb');
+    } else document.getElementById('again').onclick=()=>{newGame('onb');render();setMine(games.onb,false);focusInput()};
+    return;
+  }
+  const c=CATS[g.order[g.round]];
+  if(g.phase==='ask'){
+    app.innerHTML=bar+`<div class="card pop"><div class="eyebrow">${esc(c.t)}</div><h1>${esc(c.q)}</h1>
+      <p class="sub">Hier liggen ${c.items.length} schatten begraven. Eén poging: hoe zeldzamer je antwoord, hoe dieper je graaft (10 tot 100 m).${c.n?' '+esc(c.n):''}</p>
+      <form id="f" autocomplete="off"><input type="text" id="inp" aria-label="Jouw antwoord" placeholder="Typ je antwoord…"><button class="btn">Graaf!</button></form>
+      <div class="row"><button class="btn ghost" id="skip" type="button">Weet ik niet, laat de schatten zien</button></div></div>`;
+    document.getElementById('f').onsubmit=e=>{e.preventDefault();const v=document.getElementById('inp').value.trim();if(!v)return;answer(g,v)};
+    document.getElementById('skip').onclick=()=>answer(g,'');
+    return;
+  }
+  const r=g.res[g.round], it=r.ix!=null?c.items[r.ix]:null;
+  const rarer=it?c.items.filter(x=>x.tier>it.tier).length:0;
+  const LINES=['Een kiezel. Je schuifelt een stukje omlaag.','Een amethist! Netjes doorgegraven.','Een saffier! Je zakt flink dieper.','Een robijn! Daar zoeken de meeste mensen niet.','DIAMANT! Je boort recht naar beneden.'];
+  const head=it?`<div class="find"><div class="art">${gem(it.tier,64)}</div><div class="meta"><div class="big" style="color:${tc(it.tier)}">${esc(it.name)}</div><span class="tag" style="color:${tc(it.tier)}">${TIERS[it.tier].n} · +${r.pts} m</span></div></div>
+    <p class="sub">${LINES[it.tier]} ${rarer===1?'Er lag nog 1 zeldzamere schat.':rarer?`Er lagen nog ${rarer} zeldzamere schatten.`:''}</p>`
+    :`<div class="find"><div class="art" style="font-size:3rem;color:var(--bad)">✕</div><div class="meta"><div class="big" style="color:var(--bad)">${r.input?'“'+esc(r.input)+'” telt niet':'Overgeslagen'}</div><span class="tag" style="color:var(--bad)">+0 m</span></div></div><p class="sub">Tok! Je pikhouweel stuit op steen. Hieronder zie je alle ${c.items.length} schatten die hier lagen.</p>`;
+  const last=g.round===ROUNDS-1;
+  app.innerHTML=bar+`<div class="card pop"><div class="eyebrow">${esc(c.t)}</div><h2>${esc(c.q)}</h2>${head}<div class="row"><button class="btn" id="next">${last?'Bekijk je tocht':'Verder graven'}</button><button class="btn ghost" id="study" type="button">Oefen deze categorie</button></div></div>
+    <div class="card"><div class="eyebrow">Alle ${c.items.length} schatten, van kiezel tot diamant</div>${tierList(c,{mine:r.ix})}</div>`;
+  const nx=document.getElementById('next'); nx.focus({preventScroll:true});
+  nx.onclick=()=>{if(last){g.phase='done';store.set('played',store.get('played',0)+1);if(g.score>store.get('best',0))store.set('best',g.score);if(g.kind==='dag')store.set('dag_'+DAY,{order:g.order,score:g.score,res:g.res});saveResult(g)}else{g.round++;g.phase='ask'}render();setMine(g,false);focusInput()};
+  document.getElementById('study').onclick=()=>{newOefen(g.order[g.round]);switchTo('oefen')};
+}
+function answer(g,v){
+  const c=CATS[g.order[g.round]];const ix=v?match(v,c):null;
+  const pts=ix!=null?TIERS[c.items[ix].tier].p:0;
+  g.res[g.round]={ix,input:v,pts};g.score+=pts;g.phase='reveal';render();
+  digAnim(g,pts,ix!=null?c.items[ix].tier:0);
+}
+
+function renderOefen(){
+  const o=oefen,c=CATS[o.ci];
+  const opts=CATS.map((x,i)=>`<option value="${i}" ${i===o.ci?'selected':''}>${esc(x.t)} (${x.items.length})</option>`).join('');
+  app.innerHTML=`<div class="card"><div class="row" style="justify-content:space-between"><label class="eyebrow" for="sel">Mijnschacht</label><select id="sel">${opts}</select></div>
+    <h1>${esc(c.q)}</h1><p class="sub">Graaf zoveel schatten op als je kunt, zonder tijdslimiet. ${c.n?esc(c.n):''}</p>
+    <form id="f" autocomplete="off"><input type="text" id="inp" aria-label="Antwoord" placeholder="Typ een antwoord en druk op Enter…" ${o.shown?'disabled':''}><button class="btn" ${o.shown?'disabled':''}>Graaf!</button></form>
+    <p class="msg ${o.ok?'ok':'bad'}" aria-live="polite">${esc(o.msg)}</p>
+    <div class="row" style="justify-content:space-between"><span class="counter">${o.found.length} / ${c.items.length} opgegraven</span>
+    <span class="row"><button class="btn ghost" id="show" type="button">${o.shown?'Verberg wat je mist':'Toon alle schatten'}</button><button class="btn ghost" id="reset" type="button">Opnieuw</button></span></div></div>
+    <div class="card"><div class="eyebrow">${o.shown?'Gestippeld: nog niet gevonden':'Gestreepte vakjes liggen nog onder de grond'}</div>${tierList(c,{found:o.found,shown:o.shown})}</div>`;
+  document.getElementById('sel').onchange=e=>{newOefen(+e.target.value);render();focusInput()};
+  document.getElementById('show').onclick=()=>{o.shown=!o.shown;o.msg='';render();if(!o.shown)focusInput()};
+  document.getElementById('reset').onclick=()=>{newOefen(o.ci);render();focusInput()};
+  document.getElementById('f').onsubmit=e=>{e.preventDefault();const v=document.getElementById('inp').value.trim();if(!v)return;
+    const ix=match(v,c);
+    if(ix==null){o.msg=`“${v}” ligt hier niet begraven.`;o.ok=false}
+    else if(o.found.includes(ix)){o.msg=`${c.items[ix].name} had je al opgegraven.`;o.ok=false}
+    else{o.found.push(ix);const it=c.items[ix];o.msg=`${it.name}: ${TIERS[it.tier].n.toLowerCase()}!`;o.ok=true;if(o.found.length===c.items.length)o.msg='Mijn leeg! Alles gevonden.'}
+    render();focusInput()};
+}
+function focusInput(){const i=document.getElementById('inp');if(i&&!i.disabled)i.focus({preventScroll:true})}
+
+function saveResult(){}
+['dag','onb','oefen'].forEach(m=>document.getElementById('tab-'+m).onclick=()=>switchTo(m));
+document.getElementById('brand').innerHTML=gem(4,34)+'<span>Schatgraver</span>';
+document.getElementById('legend').innerHTML=TIERS.map((T,i)=>`<span>${gem(i,18)}${T.n} · ${T.p} m</span>`).join('')+'<span>Hoe zeldzaam een antwoord is, is een schatting.</span>';
+render(); if(mode!=='oefen')setMine(games[mode],false);
+</script>
+
+</body>
+</html>
